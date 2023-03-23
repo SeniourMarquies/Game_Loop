@@ -1,99 +1,205 @@
-
 #include "./constants.h"
 #include <SDL.h>
+#include <stdbool.h>
 #include <stdio.h>
 
-int last_frame_time = 0;
-int game_is_running = 0;
+///////////////////////////////////////////////////////////////////////////////
+// Global variables
+///////////////////////////////////////////////////////////////////////////////
+int game_is_running = false;
 SDL_Window *window = NULL;
 SDL_Renderer *renderer = NULL;
+int last_frame_time = 0;
 
-struct ball {
+///////////////////////////////////////////////////////////////////////////////
+// Declare two game objects for the ball and the paddle
+///////////////////////////////////////////////////////////////////////////////
+struct game_object {
   float x;
   float y;
   float width;
   float height;
-} ball;
+  float vel_x;
+  float vel_y;
+} ball, paddle;
 
-int Initialize_window(void) {
+///////////////////////////////////////////////////////////////////////////////
+// Function to initialize our SDL window
+///////////////////////////////////////////////////////////////////////////////
+int initialize_window(void) {
   if (SDL_Init(SDL_INIT_EVERYTHING) != 0) {
-    fprintf(stderr, "Error initializing SDL window.\n");
-    return FALSE;
+    fprintf(stderr, "Error initializing SDL.\n");
+    return false;
   }
   window =
       SDL_CreateWindow(NULL, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
                        WINDOW_WIDTH, WINDOW_HEIGHT, SDL_WINDOW_BORDERLESS);
   if (!window) {
-    fprintf(stderr, "Error creating window.\n");
-    return FALSE;
+    fprintf(stderr, "Error creating SDL Window.\n");
+    return false;
   }
-  renderer = SDL_CreateRenderer(
-      window, -1,
-      0); // -1 is for driver code and 0 for special flag which I do not care.
+  renderer = SDL_CreateRenderer(window, -1, 0);
   if (!renderer) {
-    fprintf(stderr, "Error creating renderer. \n");
-    return FALSE;
+    fprintf(stderr, "Error creating SDL Renderer.\n");
+    return false;
   }
-  return TRUE;
+  return true;
 }
-void setup() {
-  ball.x = 20;
-  ball.y = 20;
-  ball.width = 50;
-  ball.height = 50;
-}
-void process_input() {
+
+///////////////////////////////////////////////////////////////////////////////
+// Function to poll SDL events and process keyboard input
+///////////////////////////////////////////////////////////////////////////////
+void process_input(void) {
   SDL_Event event;
   SDL_PollEvent(&event);
   switch (event.type) {
   case SDL_QUIT:
-    game_is_running = FALSE;
+    game_is_running = false;
     break;
   case SDL_KEYDOWN:
-    if (event.key.keysym.sym == SDLK_ESCAPE)
-      game_is_running = FALSE;
+    if (event.key.keysym.sym == SDLK_ESCAPE) {
+      game_is_running = false;
+    }
+    // TODO: Set paddle velocity based on left/right arrow keys
+    // ...
+    if (event.key.keysym.sym == SDLK_LEFT)
+      paddle.vel_x -= 10.0;
+    if (event.key.keysym.sym == SDLK_RIGHT)
+      paddle.vel_x += 10.0;
+   
     break;
-  default:
+  case SDL_KEYUP:
+    // TODO: Reset paddle velocity based on left/right arrow keys
+    // ...
+   
     break;
   }
 }
-void update() {
 
-  // Waste some time / sleep untill we reach the frame target time
-  // this is manual implementation and this consumes lots of cpu so we gonna use
-  // sdl_delay function.
-  // while (!SDL_TICKS_PASSED(SDL_GetTicks(), last_frame_time +
-  // FRAME_TARGET_TIME));
+///////////////////////////////////////////////////////////////////////////////
+// Setup function that runs once at the beginning of our program
+///////////////////////////////////////////////////////////////////////////////
+void setup(void) {
+  // Initialize the ball object moving down at a constant velocity
+  ball.width = 15;
+  ball.height = 15;
+  ball.x = 20;
+  ball.y = 20;
+  ball.vel_x = 300;
+  ball.vel_y = 300;
+  // Initialize the paddle position at the bottom of the screen
+  paddle.width = 100;
+  paddle.height = 20;
+  paddle.x = (WINDOW_WIDTH / 2) - (paddle.width / 2);
+  paddle.y = WINDOW_HEIGHT - 40;
+  paddle.vel_x = 0;
+  paddle.vel_y = 0;
+}
 
-  float delta_time = (SDL_GetTicks() - last_frame_time) / 1000.0f;
-
-  last_frame_time = SDL_GetTicks();
+///////////////////////////////////////////////////////////////////////////////
+// Update function with a fixed time step
+///////////////////////////////////////////////////////////////////////////////
+void update(void) {
+  // Calculate how much we have to wait until we reach the target frame time
   int time_to_wait = FRAME_TARGET_TIME - (SDL_GetTicks() - last_frame_time);
-  // only call this delay if we are too fast to process this frame
+
+  // Only delay if we are too fast too update this frame
   if (time_to_wait > 0 && time_to_wait <= FRAME_TARGET_TIME)
     SDL_Delay(time_to_wait);
-  ball.x += 50 * delta_time;
-  ball.y += 50 * delta_time;
+
+  // Get delta_time factor converted to seconds to be used to update objects
+  float delta_time = (SDL_GetTicks() - last_frame_time) / 1000.0;
+
+  // Store the milliseconds of the current frame to be used in the next one
+  last_frame_time = SDL_GetTicks();
+
+  // Update ball position based on its velocity
+  ball.x += ball.vel_x * delta_time;
+  ball.y += ball.vel_y * delta_time;
+
+  // TODO: Update paddle position based on its velocity
+  // ...
+  paddle.x += paddle.vel_x * delta_time;
+  paddle.y += paddle.vel_y * delta_time;
+
+  // TODO: Check for ball collision with the walls
+  // ...
+  if (ball.x >= WINDOW_WIDTH - 1)
+    ball.vel_x = -300;
+  if (ball.x <= 0)
+    ball.vel_x = 300;
+  if (ball.y >= WINDOW_HEIGHT - 1)
+    ball.vel_y = -300;
+  if (ball.y <= 0)
+    ball.vel_y = 300;
+ 
+
+
+  // TODO: Check for ball collision with the paddle
+  // ...
+  if ((ball.y == paddle.y - 1) && (ball.x >= paddle.x - 1) &&
+      (ball.x < paddle.x + paddle.width + 1))
+  {
+    if (ball.x < paddle.x + paddle.width / 2)
+      ball.vel_x = -300;
+    else
+      ball.vel_x = 300;
+
+    ball.vel_y = -300;
+  }
+
+
+
+  // TODO: Prevent paddle from moving outside the boundaries of the window
+  // ...
+  if (paddle.x < 0)
+    paddle.x = 0;
+  if (paddle.x >= WINDOW_WIDTH - 1)
+    paddle.x = WINDOW_WIDTH - paddle.width;
+
+  // TODO: Check for game over when ball hits the bottom part of the screen
+  // ...
+  if (ball.y >= WINDOW_HEIGHT - 1)
+    ball.y = WINDOW_HEIGHT / 2;
 }
-void render() {
+
+///////////////////////////////////////////////////////////////////////////////
+// Render function to draw game objects in the SDL window
+///////////////////////////////////////////////////////////////////////////////
+void render(void) {
   SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
   SDL_RenderClear(renderer);
-  //  Here is where we can start drawing our gameobjects.
-  // Draw a rectangle
-  SDL_Rect ball_rect = {ball.x, ball.y, ball.width, ball.height};
+
+  // Draw a rectangle for the ball object
+  SDL_Rect ball_rect = {(int)ball.x, (int)ball.y, (int)ball.width,
+                        (int)ball.height};
   SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
   SDL_RenderFillRect(renderer, &ball_rect);
-  SDL_RenderPresent(renderer); // Swapping buffer. Back-Fort buffer.
-}
-void destroy_window() {
 
+  // Draw a rectangle for the paddle object
+  SDL_Rect paddle_rect = {(int)paddle.x, (int)paddle.y, (int)paddle.width,
+                          (int)paddle.height};
+  SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
+  SDL_RenderFillRect(renderer, &paddle_rect);
+
+  SDL_RenderPresent(renderer);
+}
+
+///////////////////////////////////////////////////////////////////////////////
+// Function to destroy SDL window and renderer
+///////////////////////////////////////////////////////////////////////////////
+void destroy_window(void) {
   SDL_DestroyRenderer(renderer);
   SDL_DestroyWindow(window);
   SDL_Quit();
 }
 
+///////////////////////////////////////////////////////////////////////////////
+// Main function
+///////////////////////////////////////////////////////////////////////////////
 int main(int argc, char *args[]) {
-  game_is_running = Initialize_window();
+  game_is_running = initialize_window();
+
   setup();
 
   while (game_is_running) {
@@ -101,6 +207,8 @@ int main(int argc, char *args[]) {
     update();
     render();
   }
+
   destroy_window();
+
   return 0;
 }
